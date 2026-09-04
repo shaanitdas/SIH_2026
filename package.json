@@ -1,0 +1,27 @@
+{
+  "name": "sih_2026",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm --workspace @sih/shared run build && npm --workspace @sih/server run build && npm --workspace @sih/extension run build",
+    "lint": "npm --workspace @sih/shared run lint && npm --workspace @sih/server run lint && npm --workspace @sih/extension run lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://localhost:26831/shaanitdas/SIH_2026"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,0 +1,88 @@
+import { VisionModelDescriptor } from "@sih/shared";
+
+export const MODEL_CATALOG: VisionModelDescriptor[] = [
+  {
+    id: "mediapipe-blazeface-short",
+    name: "MediaPipe BlazeFace (short-range)",
+    family: "mediapipe",
+    task: "face_detection",
+    approxSizeMB: 1.2,
+    expectedLatencyMs: { webgpu: 14, wasm: 26, cpu: 45 },
+    metricFit: {
+      visualContextAccuracy: 0.82,
+      piiRecallPrecision: 0.88,
+      redactionPrecision: 0.9,
+      resourceUtilization: 0.95,
+      endToEndLatency: 0.94,
+    },
+    recommendedFor: ["lite", "balanced", "performance"],
+    source: "Google MediaPipe Face Detector (BlazeFace)",
+    notes: [
+      "Real-time face bounding boxes for blur/blackout redaction.",
+      "Best when video regions dominate DOM-blind content.",
+    ],
+  },
+  {
+    id: "ppocr-mobile-onnx",
+    name: "PaddleOCR Mobile (ONNX export)",
+    family: "onnx",
+    task: "ocr",
+    approxSizeMB: 18,
+    expectedLatencyMs: { webgpu: 38, wasm: 72, cpu: 120 },
+    metricFit: {
+      visualContextAccuracy: 0.86,
+      piiRecallPrecision: 0.91,
+      redactionPrecision: 0.89,
+      resourceUtilization: 0.72,
+      endToEndLatency: 0.7,
+    },
+    recommendedFor: ["balanced", "performance"],
+    source: "PaddleOCR ONNX family",
+    notes: [
+      "High recall for text-heavy canvas/iframe content.",
+      "Use quantized variants for weaker devices.",
+    ],
+  },
+  {
+    id: "yolov8n-layout-onnx",
+    name: "YOLOv8n UI/Layout Detector (ONNX)",
+    family: "onnx",
+    task: "layout_detection",
+    approxSizeMB: 6.2,
+    expectedLatencyMs: { webgpu: 24, wasm: 44, cpu: 70 },
+    metricFit: {
+      visualContextAccuracy: 0.89,
+      piiRecallPrecision: 0.76,
+      redactionPrecision: 0.8,
+      resourceUtilization: 0.84,
+      endToEndLatency: 0.86,
+    },
+    recommendedFor: ["balanced", "performance"],
+    source: "YOLOv8 nano ONNX variants",
+    notes: [
+      "Useful for structural understanding of non-DOM surfaces.",
+      "Strong region proposals for downstream OCR/redaction.",
+    ],
+  },
+  {
+    id: "trocr-small-transformersjs",
+    name: "TrOCR small (Transformers.js)",
+    family: "transformers",
+    task: "ocr",
+    approxSizeMB: 73,
+    expectedLatencyMs: { webgpu: 85, wasm: 180, cpu: 260 },
+    metricFit: {
+      visualContextAccuracy: 0.87,
+      piiRecallPrecision: 0.93,
+      redactionPrecision: 0.9,
+      resourceUtilization: 0.54,
+      endToEndLatency: 0.46,
+    },
+    recommendedFor: ["performance"],
+    source: "Transformers.js image-to-text models",
+    notes: [
+      "High OCR quality but heavy for low-resource devices.",
+      "Use only when hardware tier is performance and text recall is critical.",
+    ],
+  },
+];
