@@ -1,39 +1,100 @@
-import { SanitizedContext } from "@sih/shared";
+import { SanitizedContext, SecuritySignal } from "@sih/shared";
+import { computeRubricMetrics, attachMetrics } from "./metrics/metricsEngine.js";
 import { extractVisibleDom } from "./pipeline/domExtractor.js";
 import { detectPii } from "./privacy/piiDetector.js";
 import { redactElements } from "./privacy/redactor.js";
+import { evaluateConsentRequirement } from "./runtime/consentManager.js";
+import { executePlan } from "./runtime/actionExecutor.js";
 import { validatePlan } from "./runtime/actionGuardian.js";
+import { detectRuntimeProfile } from "./runtime/runtimeProfile.js";
+import { detectPromptInjectionSignals } from "./security/promptInjectionGuard.js";
 import { requestActionPlan } from "./transport/client.js";
+import { logMetricsDashboard } from "./ui/dashboard.js";
 import { logPrivacyLedger } from "./ui/privacyLedger.js";
+import { detectDomBlindSpots } from "./vision/domBlindSpotDetector.js";
+import { runVisionInWorkerLikeMode } from "./vision/workerAdapter.js";
 
 const SERVER_URL = "http://localhost:8080";
 
-function buildContext(): SanitizedContext {
-  const elements = extractVisibleDom();
-  const sensitiveEntities = detectPii(elements);
-  const redactedElements = redactElements(elements, sensitiveEntities);
+function mergeSignals(...chunks: SecuritySignal[][]): SecuritySignal[] {
+  return chunks.flat().filter((signal, index, array) => {
+    const key = `${signal.type}:${signal.elementId ?? "na"}:${signal.message}`;
+    return array.findIndex((item) => `${item.type}:${item.elementId ?? "na"}:${item.message}` === key) === index;
+  });
+}
 
-  return {
+async function buildContext(startedAt: number): Promise<SanitizedContext> {
+  const runtimeProfile = detectRuntimeProfile();
+  const elements = extractVisibleDom();
+  const blindSpots = detectDomBlindSpots();
+  const pii = detectPii(elements);
+  const visionOutput = await runVisionInWorkerLikeMode(blindSpots, elements);
+
+  const allEntities = [...pii.entities, ...visionOutput.entities];
+  const redaction = redactElements(elements, allEntities);
+  const securitySignals = mergeSignals(
+    detectPromptInjectionSignals(redaction.elements),
+    allEntities.filter((entity) => entity.confidence < 0.65).map((entity) => ({
+      type: "UNKNOWN_AUTOMATION_TRAP" as const,
+      confidence: 0.7,
+      message: `Uncertain entity detection requires user confirmation (${entity.type})`,
+      elementId: entity.elementId,
+    })),
+  );
+
+  const endedAt = performance.now();
+  const metrics = computeRubricMetrics({
+    startedAt,
+    endedAt,
+    totalElements: elements.length,
+    detectionRecall: pii.summary.recallEstimate,
+    detectionPrecision: pii.summary.precisionEstimate,
+    redactionPrecision: redaction.precisionEstimate,
+    runtimeProfile,
+    blindSpots,
+  });
+
+  const privacyScore = Math.max(0, Math.min(1, metrics.redactionPrecision * metrics.piiRecallPrecision));
+
+  const context: SanitizedContext = {
     sessionId: crypto.randomUUID(),
     pageUrl: window.location.href,
     pageTitle: document.title,
     timestamp: new Date().toISOString(),
-    elements: redactedElements,
-    sensitiveEntities,
-    redactedRegions: redactedElements
-      .filter((el) => el.sensitivity !== "public")
-      .map((el) => el.bounds),
-    policyVersion: "v1.0.0",
-    privacyScore: Math.max(0, 1 - sensitiveEntities.length / Math.max(elements.length, 1)),
+    elements: redaction.elements,
+    sensitiveEntities: allEntities,
+    redactedRegions: redaction.redactedRegions,
+    tokenMap: redaction.tokenMap,
+    policyVersion: "v2.0.0",
+    privacyScore,
+    detectionSummary: pii.summary,
+    visionObservations: visionOutput.observations,
+    securitySignals,
+    policyDecisions: [],
+    runtimeProfile,
   };
+
+  return attachMetrics(context, metrics);
 }
 
 export async function runAgentCycle(userGoal: string): Promise<void> {
-  const context = buildContext();
+  const startedAt = performance.now();
+  const context = await buildContext(startedAt);
+
   logPrivacyLedger(context);
+  if (context.metrics) {
+    logMetricsDashboard(context.metrics);
+  }
 
   const response = await requestActionPlan(SERVER_URL, userGoal, context);
-  const validatedPlan = validatePlan(response.plan);
+  const validatedPlan = validatePlan(response.plan, context);
+  const consentDecision = evaluateConsentRequirement(context, validatedPlan);
 
-  console.info("[agent-plan]", validatedPlan);
+  if (!consentDecision.approved) {
+    console.warn("[consent-required]", consentDecision);
+    return;
+  }
+
+  executePlan(validatedPlan);
+  console.info("[agent-plan-executed]", validatedPlan);
 }

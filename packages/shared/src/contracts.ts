@@ -1,5 +1,21 @@
 export type DataSensitivity = "public" | "sensitive" | "restricted";
 
+export type SensitiveEntityType =
+  | "AADHAAR"
+  | "PAN"
+  | "UPI"
+  | "GSTIN"
+  | "PHONE_IN"
+  | "EMAIL"
+  | "PASSWORD"
+  | "FACE"
+  | "NAME"
+  | "ADDRESS"
+  | "ACCOUNT"
+  | "IFSC"
+  | "DOB"
+  | "CARD_NUMBER";
+
 export interface BoundingBox {
   x: number;
   y: number;
@@ -18,25 +34,62 @@ export interface UiElement {
   bounds: BoundingBox;
   sensitivity: DataSensitivity;
   redactedText?: string;
+  attributes?: Record<string, string>;
 }
 
 export interface SensitiveEntity {
   id: string;
-  type:
-    | "AADHAAR"
-    | "PAN"
-    | "UPI"
-    | "GSTIN"
-    | "PHONE_IN"
-    | "EMAIL"
-    | "PASSWORD"
-    | "FACE"
-    | "NAME"
-    | "ADDRESS"
-    | "ACCOUNT";
+  elementId: string;
+  type: SensitiveEntityType;
   confidence: number;
   source: "regex" | "ner" | "vision" | "structural";
   token: string;
+  reasons: string[];
+  matchText?: string;
+}
+
+export interface DetectionSummary {
+  recallEstimate: number;
+  precisionEstimate: number;
+  uncertainCount: number;
+}
+
+export interface VisionObservation {
+  id: string;
+  kind: "canvas" | "video" | "iframe";
+  bounds: BoundingBox;
+  sensitivityGuess: DataSensitivity;
+  confidence: number;
+  notes: string[];
+}
+
+export interface RuntimeProfile {
+  executionMode: "webgpu" | "wasm" | "cpu";
+  profileTier: "lite" | "balanced" | "performance";
+  hardwareConcurrency: number;
+  deviceMemoryGB?: number;
+}
+
+export interface SecuritySignal {
+  type: "PROMPT_INJECTION" | "MALICIOUS_INSTRUCTION" | "UNKNOWN_AUTOMATION_TRAP";
+  confidence: number;
+  message: string;
+  elementId?: string;
+}
+
+export interface PolicyDecision {
+  policy: string;
+  status: "pass" | "warn" | "block";
+  reason: string;
+}
+
+export interface RubricMetrics {
+  visualContextAccuracy: number;
+  piiRecallPrecision: number;
+  redactionPrecision: number;
+  resourceUtilization: number;
+  endToEndLatency: number;
+  weightedOverall: number;
 }
 
 export interface SanitizedContext {
@@ -47,8 +100,15 @@ export interface SanitizedContext {
   elements: UiElement[];
   sensitiveEntities: SensitiveEntity[];
   redactedRegions: BoundingBox[];
+  tokenMap: Record<string, string>;
   policyVersion: string;
   privacyScore: number;
+  detectionSummary: DetectionSummary;
+  visionObservations: VisionObservation[];
+  securitySignals: SecuritySignal[];
+  policyDecisions: PolicyDecision[];
+  runtimeProfile: RuntimeProfile;
+  metrics?: RubricMetrics;
 }
 
 export type AgentActionType =
@@ -74,6 +134,7 @@ export interface ActionPlan {
   actions: AgentAction[];
   requiresUserConsent: boolean;
   generatedAt: string;
+  guardrailNotes: string[];
 }
 
 export interface PlanRequest {
@@ -84,4 +145,17 @@ export interface PlanRequest {
 export interface PlanResponse {
   plan: ActionPlan;
   serverNotes: string[];
+}
+
+export interface ConsentDecision {
+  approved: boolean;
+  reason: string;
+  requiredActions: string[];
+}
+
+export interface RedactionResult {
+  elements: UiElement[];
+  tokenMap: Record<string, string>;
+  redactedRegions: BoundingBox[];
+  precisionEstimate: number;
 }

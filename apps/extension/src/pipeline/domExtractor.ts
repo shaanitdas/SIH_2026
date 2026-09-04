@@ -17,12 +17,24 @@ function getDomPath(element: Element): string {
   return path.join(" > ");
 }
 
-export function extractVisibleDom(maxElements = 200): UiElement[] {
-  const selector = "button, input, textarea, a, select, [role], [contenteditable='true']";
-  const nodes = Array.from(document.querySelectorAll<HTMLElement>(selector)).slice(
-    0,
-    maxElements,
-  );
+function pickAttributes(node: HTMLElement): Record<string, string> {
+  const keys = ["name", "id", "aria-label", "autocomplete", "type", "title"];
+  return keys.reduce<Record<string, string>>((acc, key) => {
+    const value = node.getAttribute(key);
+    if (value) acc[key] = value;
+    return acc;
+  }, {});
+}
+
+export function extractVisibleDom(maxElements = 250): UiElement[] {
+  const selector = "button, input, textarea, a, select, [role], [contenteditable='true'], label";
+  const nodes = Array.from(document.querySelectorAll<HTMLElement>(selector))
+    .filter((node) => {
+      const rect = node.getBoundingClientRect();
+      const style = window.getComputedStyle(node);
+      return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+    })
+    .slice(0, maxElements);
 
   return nodes.map((node, index) => {
     const rect = node.getBoundingClientRect();
@@ -31,13 +43,13 @@ export function extractVisibleDom(maxElements = 200): UiElement[] {
     return {
       id: `el_${index + 1}`,
       role,
-      text: (node.innerText || node.textContent || "").trim().slice(0, 120),
+      text: (node.innerText || node.textContent || "").trim().slice(0, 180),
       placeholder: node.getAttribute("placeholder") ?? undefined,
       valueHint:
         node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement
           ? node.type === "password"
             ? "password"
-            : node.value.slice(0, 60)
+            : node.value.slice(0, 80)
           : undefined,
       domPath: getDomPath(node),
       bounds: {
@@ -47,6 +59,7 @@ export function extractVisibleDom(maxElements = 200): UiElement[] {
         height: rect.height,
         confidence: 1,
       },
+      attributes: pickAttributes(node),
       sensitivity: "public",
     };
   });

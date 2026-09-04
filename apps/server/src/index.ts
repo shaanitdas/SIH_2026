@@ -1,7 +1,9 @@
 import cors from "cors";
 import express from "express";
 import { z } from "zod";
-import { ActionPlan, PlanRequest, PlanResponse } from "@sih/shared";
+import { PlanRequest, PlanResponse } from "@sih/shared";
+import { buildPlan } from "./planner/buildPlan.js";
+import { shouldForceConsent } from "./security/serverPolicy.js";
 
 const app = express();
 app.use(cors());
@@ -15,47 +17,40 @@ const planRequestSchema = z.object({
     pageTitle: z.string(),
     timestamp: z.string(),
     elements: z.array(z.any()).max(250),
-    sensitiveEntities: z.array(z.any()).max(200),
-    redactedRegions: z.array(z.any()).max(200),
+    sensitiveEntities: z.array(z.any()).max(220),
+    redactedRegions: z.array(z.any()).max(220),
+    tokenMap: z.record(z.string(), z.string()),
     policyVersion: z.string(),
-    privacyScore: z.number(),
+    privacyScore: z.number().min(0).max(1),
+    detectionSummary: z.object({
+      recallEstimate: z.number().min(0).max(1),
+      precisionEstimate: z.number().min(0).max(1),
+      uncertainCount: z.number().int().min(0),
+    }),
+    visionObservations: z.array(z.any()).max(80),
+    securitySignals: z.array(z.any()).max(80),
+    policyDecisions: z.array(z.any()).max(40),
+    runtimeProfile: z.object({
+      executionMode: z.enum(["webgpu", "wasm", "cpu"]),
+      profileTier: z.enum(["lite", "balanced", "performance"]),
+      hardwareConcurrency: z.number().int().min(1),
+      deviceMemoryGB: z.number().optional(),
+    }),
+    metrics: z
+      .object({
+        visualContextAccuracy: z.number().min(0).max(1),
+        piiRecallPrecision: z.number().min(0).max(1),
+        redactionPrecision: z.number().min(0).max(1),
+        resourceUtilization: z.number().min(0).max(1),
+        endToEndLatency: z.number().min(0).max(1),
+        weightedOverall: z.number().min(0).max(1),
+      })
+      .optional(),
   }),
 });
 
-function buildPlan(payload: PlanRequest): ActionPlan {
-  const firstSafeTarget = payload.context.elements.find(
-    (el) => el.sensitivity === "public" && el.role !== "input",
-  );
-
-  return {
-    planId: crypto.randomUUID(),
-    taskSummary: `Assist user goal: ${payload.userGoal}`,
-    generatedAt: new Date().toISOString(),
-    requiresUserConsent: payload.context.privacyScore < 0.8,
-    actions: [
-      {
-        id: "action_1",
-        type: "WAIT",
-        reason: "Analyze sanitized UI context",
-        confidence: 0.95,
-        riskLevel: "low",
-      },
-      {
-        id: "action_2",
-        type: firstSafeTarget ? "CLICK" : "CONFIRM_REQUIRED",
-        targetElementId: firstSafeTarget?.id,
-        reason: firstSafeTarget
-          ? "First public actionable element selected"
-          : "No confident public target found",
-        confidence: firstSafeTarget ? 0.72 : 0.45,
-        riskLevel: firstSafeTarget ? "medium" : "high",
-      },
-    ],
-  };
-}
-
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "sih-privacy-planner" });
+  res.json({ ok: true, service: "sih-privacy-planner-v2" });
 });
 
 app.post("/api/plan", (req, res) => {
@@ -65,13 +60,15 @@ app.post("/api/plan", (req, res) => {
   }
 
   const payload = parsed.data as PlanRequest;
-  const plan = buildPlan(payload);
+  const consent = shouldForceConsent(payload);
+  const plan = buildPlan(payload, consent.force);
 
   const response: PlanResponse = {
     plan,
     serverNotes: [
-      "Received sanitized context only",
-      "High-risk actions require local consent gate",
+      "Received sanitized context only.",
+      consent.reason,
+      `Runtime profile: ${payload.context.runtimeProfile.executionMode}/${payload.context.runtimeProfile.profileTier}`,
     ],
   };
 
