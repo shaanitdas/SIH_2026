@@ -28,6 +28,25 @@ const planRequestSchema = z.object({
       uncertainCount: z.number().int().min(0),
     }),
     visionObservations: z.array(z.any()).max(80),
+    selectedVisionModel: z
+      .object({
+        descriptor: z.object({
+          id: z.string(),
+          name: z.string(),
+          family: z.enum(["mediapipe", "onnx", "transformers"]),
+          task: z.enum(["face_detection", "ocr", "layout_detection"]),
+        }),
+        weightedScore: z.number().min(0).max(1),
+        reasons: z.array(z.string()).max(10),
+      })
+      .optional(),
+    modelSelectionTrace: z
+      .object({
+        shortlist: z.array(z.object({ modelId: z.string(), score: z.number() })).max(5),
+        dominantBlindSpot: z.enum(["canvas", "video", "iframe", "none"]),
+        selectedModelId: z.string(),
+      })
+      .optional(),
     securitySignals: z.array(z.any()).max(80),
     policyDecisions: z.array(z.any()).max(40),
     runtimeProfile: z.object({
@@ -69,6 +88,7 @@ app.post("/api/plan", (req, res) => {
       "Received sanitized context only.",
       consent.reason,
       `Runtime profile: ${payload.context.runtimeProfile.executionMode}/${payload.context.runtimeProfile.profileTier}`,
+      `Vision model: ${payload.context.selectedVisionModel?.descriptor.id ?? "not-provided"}`,
     ],
   };
 

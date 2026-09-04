@@ -3,15 +3,17 @@ import { computeRubricMetrics, attachMetrics } from "./metrics/metricsEngine.js"
 import { extractVisibleDom } from "./pipeline/domExtractor.js";
 import { detectPii } from "./privacy/piiDetector.js";
 import { redactElements } from "./privacy/redactor.js";
-import { evaluateConsentRequirement } from "./runtime/consentManager.js";
 import { executePlan } from "./runtime/actionExecutor.js";
 import { validatePlan } from "./runtime/actionGuardian.js";
+import { evaluateConsentRequirement } from "./runtime/consentManager.js";
 import { detectRuntimeProfile } from "./runtime/runtimeProfile.js";
 import { detectPromptInjectionSignals } from "./security/promptInjectionGuard.js";
 import { requestActionPlan } from "./transport/client.js";
 import { logMetricsDashboard } from "./ui/dashboard.js";
 import { logPrivacyLedger } from "./ui/privacyLedger.js";
 import { detectDomBlindSpots } from "./vision/domBlindSpotDetector.js";
+import { loadSelectedModel } from "./vision/modelLoader.js";
+import { selectVisionModel } from "./vision/modelSelector.js";
 import { runVisionInWorkerLikeMode } from "./vision/workerAdapter.js";
 
 const SERVER_URL = "http://localhost:8080";
@@ -19,7 +21,11 @@ const SERVER_URL = "http://localhost:8080";
 function mergeSignals(...chunks: SecuritySignal[][]): SecuritySignal[] {
   return chunks.flat().filter((signal, index, array) => {
     const key = `${signal.type}:${signal.elementId ?? "na"}:${signal.message}`;
-    return array.findIndex((item) => `${item.type}:${item.elementId ?? "na"}:${item.message}` === key) === index;
+    return (
+      array.findIndex(
+        (item) => `${item.type}:${item.elementId ?? "na"}:${item.message}` === key,
+      ) === index
+    );
   });
 }
 
@@ -28,7 +34,14 @@ async function buildContext(startedAt: number): Promise<SanitizedContext> {
   const elements = extractVisibleDom();
   const blindSpots = detectDomBlindSpots();
   const pii = detectPii(elements);
-  const visionOutput = await runVisionInWorkerLikeMode(blindSpots, elements);
+
+  const modelChoice = selectVisionModel(runtimeProfile, blindSpots);
+  const loadResult = await loadSelectedModel(modelChoice.selected, runtimeProfile);
+  const visionOutput = await runVisionInWorkerLikeMode(
+    blindSpots,
+    elements,
+    modelChoice.selected,
+  );
 
   const allEntities = [...pii.entities, ...visionOutput.entities];
   const redaction = redactElements(elements, allEntities);
@@ -69,8 +82,16 @@ async function buildContext(startedAt: number): Promise<SanitizedContext> {
     privacyScore,
     detectionSummary: pii.summary,
     visionObservations: visionOutput.observations,
+    selectedVisionModel: modelChoice.selected,
+    modelSelectionTrace: modelChoice.trace,
     securitySignals,
-    policyDecisions: [],
+    policyDecisions: [
+      {
+        policy: "adaptive-vision-model-selection",
+        status: loadResult.loaded ? "pass" : "warn",
+        reason: `${modelChoice.selected.descriptor.id} prepared with ${loadResult.backend}; warmup ${loadResult.warmupMs}ms.`,
+      },
+    ],
     runtimeProfile,
   };
 
@@ -83,7 +104,7 @@ export async function runAgentCycle(userGoal: string): Promise<void> {
 
   logPrivacyLedger(context);
   if (context.metrics) {
-    logMetricsDashboard(context.metrics);
+    logMetricsDashboard(context.metrics, context.selectedVisionModel);
   }
 
   const response = await requestActionPlan(SERVER_URL, userGoal, context);

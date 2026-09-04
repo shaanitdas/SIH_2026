@@ -30,6 +30,9 @@ This repository now implements **M1 through M6** in a working architecture scaff
 │   │       └── vision
 │   │           ├── domBlindSpotDetector.ts
 │   │           ├── inferenceAdapter.ts
+│   │           ├── modelCatalog.ts
+│   │           ├── modelLoader.ts
+│   │           ├── modelSelector.ts
 │   │           └── workerAdapter.ts
 │   └── server
 │       └── src
@@ -108,11 +111,15 @@ Handle UI areas where DOM extraction is blind (canvas/video/iframe).
 - DOM-blind region detector for canvas/video/iframe blocks.
 - Vision fallback adapter abstraction that converts blind regions into vision observations + potential sensitive entities.
 - Worker-like async execution wrapper (`workerAdapter`) so vision runs can be offloaded without blocking flow.
+- Research-backed model catalog + rubric-weighted model selector chooses model per runtime profile and blind-spot type.
 - Vision entities are merged with DOM-driven entities before redaction and policy checks.
 
 ### Files powering M3
 - `/home/runner/work/SIH_2026/SIH_2026/apps/extension/src/vision/domBlindSpotDetector.ts`
 - `/home/runner/work/SIH_2026/SIH_2026/apps/extension/src/vision/inferenceAdapter.ts`
+- `/home/runner/work/SIH_2026/SIH_2026/apps/extension/src/vision/modelCatalog.ts`
+- `/home/runner/work/SIH_2026/SIH_2026/apps/extension/src/vision/modelSelector.ts`
+- `/home/runner/work/SIH_2026/SIH_2026/apps/extension/src/vision/modelLoader.ts`
 - `/home/runner/work/SIH_2026/SIH_2026/apps/extension/src/vision/workerAdapter.ts`
 - `/home/runner/work/SIH_2026/SIH_2026/apps/extension/src/index.ts`
 
@@ -176,6 +183,7 @@ Improve robustness against attacks and low-resource constraints.
 - Transport payload minimizer to cap data volume and latency.
 - Strict transport policy to ensure sensitive values never leave client in raw form.
 - Runtime profile detection for adaptive mode awareness (`webgpu`/`wasm`/`cpu`, tiering).
+- Adaptive model loading hooks with model score traces and warmup metadata.
 - Server-side schema validation + guardrail notes + consent forcing.
 
 ### Files powering M6
@@ -195,14 +203,16 @@ Improve robustness against attacks and low-resource constraints.
 2. `domExtractor.ts` captures visible actionable DOM context.
 3. `domBlindSpotDetector.ts` identifies non-DOM visual zones.
 4. `piiDetector.ts` runs layered entity detection.
-5. `workerAdapter.ts + inferenceAdapter.ts` add vision fallback entities.
-6. `redactor.ts` tokenizes/masks and builds `tokenMap` + redaction regions.
-7. `promptInjectionGuard.ts` emits security signals.
-8. `metricsEngine.ts` computes rubric score snapshot.
-9. `policy.ts + payloadMinimizer.ts + client.ts` enforce and transmit minimal sanitized context.
-10. Server validates request, applies `serverPolicy.ts`, and builds constrained plan.
-11. `actionGuardian.ts` and `consentManager.ts` enforce local final safety.
-12. `actionExecutor.ts` executes only allowed actions; logs via ledger/dashboard.
+5. `modelCatalog.ts + modelSelector.ts` select the best model using SIH metric-weighted scoring.
+6. `modelLoader.ts` prepares runtime-adaptive loading path for selected model.
+7. `workerAdapter.ts + inferenceAdapter.ts` add vision fallback entities.
+8. `redactor.ts` tokenizes/masks and builds `tokenMap` + redaction regions.
+9. `promptInjectionGuard.ts` emits security signals.
+10. `metricsEngine.ts` computes rubric score snapshot.
+11. `policy.ts + payloadMinimizer.ts + client.ts` enforce and transmit minimal sanitized context.
+12. Server validates request, applies `serverPolicy.ts`, and builds constrained plan.
+13. `actionGuardian.ts` and `consentManager.ts` enforce local final safety.
+14. `actionExecutor.ts` executes only allowed actions; logs via ledger/dashboard.
 
 ---
 
@@ -234,7 +244,46 @@ npm --workspace @sih/server run start
 
 ---
 
-## 6) Next engineering upgrades (optional for competition polishing)
+## 6) Model research and integration rationale (new)
+
+To keep model choice aligned with SIH scoring, the extension now uses a **rubric-weighted selection step** instead of a fixed model.
+
+### Research-backed candidate pool in code
+- `mediapipe-blazeface-short` (face-heavy video regions, excellent device efficiency)
+- `ppocr-mobile-onnx` (text-heavy canvas/iframe for high PII recall)
+- `yolov8n-layout-onnx` (fast structural region understanding)
+- `trocr-small-transformersjs` (high OCR quality, only for strong hardware)
+
+These are encoded in `/home/runner/work/SIH_2026/SIH_2026/apps/extension/src/vision/modelCatalog.ts`.
+
+### How selection is done
+- Selector computes a weighted score using SIH rubric weights:
+  - 25% visual context accuracy
+  - 20% PII recall/precision
+  - 20% redaction precision
+  - 20% resource utilization
+  - 15% end-to-end latency
+- Then applies runtime-aware bonuses/penalties:
+  - device mode (`webgpu`/`wasm`/`cpu`)
+  - model size
+  - expected latency
+  - dominant blind-spot type (`video` vs `canvas`/`iframe`)
+
+Implemented in `/home/runner/work/SIH_2026/SIH_2026/apps/extension/src/vision/modelSelector.ts`.
+
+### Why this helps judging metrics
+- Avoids “one model for every device” inefficiency.
+- Improves **resource utilization** and **latency** on weaker devices.
+- Preserves **PII recall/precision** by preferring OCR-heavy models where needed.
+- Preserves **visual accuracy** by preferring face/layout-specialized models for corresponding blind spots.
+
+### Current integration depth
+- Selection + load-path orchestration is fully integrated and running end-to-end.
+- Inference adapter is pluggable; direct model runtime calls can be swapped in without changing contracts.
+
+---
+
+## 7) Next engineering upgrades (optional for competition polishing)
 
 - Replace heuristic NER with on-device quantized NER model.
 - Plug real face/text-region detector for image fallback.

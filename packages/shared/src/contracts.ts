@@ -70,6 +70,39 @@ export interface RuntimeProfile {
   deviceMemoryGB?: number;
 }
 
+export interface ModelMetricFit {
+  visualContextAccuracy: number;
+  piiRecallPrecision: number;
+  redactionPrecision: number;
+  resourceUtilization: number;
+  endToEndLatency: number;
+}
+
+export interface VisionModelDescriptor {
+  id: string;
+  name: string;
+  family: "mediapipe" | "onnx" | "transformers";
+  task: "face_detection" | "ocr" | "layout_detection";
+  approxSizeMB: number;
+  expectedLatencyMs: Record<RuntimeProfile["executionMode"], number>;
+  metricFit: ModelMetricFit;
+  recommendedFor: RuntimeProfile["profileTier"][];
+  source: string;
+  notes: string[];
+}
+
+export interface SelectedVisionModel {
+  descriptor: VisionModelDescriptor;
+  weightedScore: number;
+  reasons: string[];
+}
+
+export interface ModelSelectionTrace {
+  shortlist: Array<{ modelId: string; score: number }>;
+  dominantBlindSpot: VisionObservation["kind"] | "none";
+  selectedModelId: string;
+}
+
 export interface SecuritySignal {
   type: "PROMPT_INJECTION" | "MALICIOUS_INSTRUCTION" | "UNKNOWN_AUTOMATION_TRAP";
   confidence: number;
@@ -105,6 +138,8 @@ export interface SanitizedContext {
   privacyScore: number;
   detectionSummary: DetectionSummary;
   visionObservations: VisionObservation[];
+  selectedVisionModel?: SelectedVisionModel;
+  modelSelectionTrace?: ModelSelectionTrace;
   securitySignals: SecuritySignal[];
   policyDecisions: PolicyDecision[];
   runtimeProfile: RuntimeProfile;
