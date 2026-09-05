@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PrivacyGuard</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="head">
+        <div class="logo">PG</div>
+        <div>
+          <h1>PrivacyGuard</h1>
+          <p class="sub">On-device visual browser agent</p>
+        </div>
+      </header>
+
+      <section class="status">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">Checking extension context…</span>
+      </section>
+
+      <label class="field-label" for="goal">What should the agent do?</label>
+      <textarea id="goal" rows="3" placeholder="e.g. Find the scholarship form and submit it"></textarea>
+      <button id="runBtn" class="run" disabled>Run agent on this tab</button>
+
+      <section class="privacy" id="privacySummary">
+        <div class="row"><span>PII found</span><strong id="piiCount">—</strong></div>
+        <div class="row"><span>Regions redacted</span><strong id="redactedCount">—</strong></div>
+        <div class="row"><span>Privacy score</span><strong id="privacyScore">—</strong></div>
+      </section>
+
+      <footer>
+        <p class="hint">Only typed tokens are sent to the planner. Raw values never leave this device.</p>
+      </footer>
+    </main>
+    <script src="./popup.js"></script>
+  </body>
+</html>

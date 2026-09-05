@@ -5,3 +5,16 @@ dist/
 .DS_Store
 
 *.tsbuildinfo
+
+# local deployment secrets / env
+.env
+.env.local
+
+# chrome extension signing key + packed build (keep private, never commit)
+*.pem
+*.crx
+
+# playwright / e2e artifacts
+test-results/
+playwright-report/
+e2e/.tmp/

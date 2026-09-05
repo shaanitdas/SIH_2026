@@ -1,8 +1,8 @@
 import { RubricMetrics, RuntimeProfile, SanitizedContext, VisionObservation } from "@sih/shared";
+import { Telemetry } from "./telemetry.js";
 
 interface MetricInput {
-  startedAt: number;
-  endedAt: number;
+  telemetry: Telemetry;
   totalElements: number;
   detectionRecall: number;
   detectionPrecision: number;
@@ -15,6 +15,10 @@ function latencyScore(durationMs: number): number {
   if (durationMs <= 700) return 1;
   if (durationMs >= 5000) return 0.3;
   return Math.max(0.3, 1 - (durationMs - 700) / 6000);
+}
+
+function round4(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
 }
 
 function resourceScore(profile: RuntimeProfile, totalElements: number): number {
@@ -34,7 +38,7 @@ export function computeRubricMetrics(input: MetricInput): RubricMetrics {
   const piiRecallPrecision = (input.detectionRecall + input.detectionPrecision) / 2;
   const redactionPrecision = input.redactionPrecision;
   const resourceUtilization = resourceScore(input.runtimeProfile, input.totalElements);
-  const endToEndLatency = latencyScore(input.endedAt - input.startedAt);
+  const endToEndLatency = latencyScore(input.telemetry.totalMs());
 
   const weightedOverall =
     visualContextAccuracy * 0.25 +
@@ -44,12 +48,12 @@ export function computeRubricMetrics(input: MetricInput): RubricMetrics {
     endToEndLatency * 0.15;
 
   return {
-    visualContextAccuracy,
-    piiRecallPrecision,
-    redactionPrecision,
-    resourceUtilization,
-    endToEndLatency,
-    weightedOverall,
+    visualContextAccuracy: round4(visualContextAccuracy),
+    piiRecallPrecision: round4(piiRecallPrecision),
+    redactionPrecision: round4(redactionPrecision),
+    resourceUtilization: round4(resourceUtilization),
+    endToEndLatency: round4(endToEndLatency),
+    weightedOverall: round4(weightedOverall),
   };
 }
 

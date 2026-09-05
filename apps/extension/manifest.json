@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "PrivacyGuard — On-device Visual Browser Agent",
+  "short_name": "PrivacyGuard",
+  "version": "1.0.0",
+  "description": "Privacy-preserving on-device visual perception for lightweight browser agents. Sanitizes PII locally before planning.",
+  "minimum_chrome_version": "111",
+  "permissions": ["activeTab", "scripting", "storage", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "dist/background/serviceWorker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "dist/popup/popup.html",
+    "default_title": "PrivacyGuard Browser Agent",
+    "default_icon": {
+      "16": "dist/icons/icon16.png",
+      "48": "dist/icons/icon48.png",
+      "128": "dist/icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["dist/content/contentScript.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["dist/icons/*.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "icons": {
+    "16": "dist/icons/icon16.png",
+    "48": "dist/icons/icon48.png",
+    "128": "dist/icons/icon128.png"
+  }
+}

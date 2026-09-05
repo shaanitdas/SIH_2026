@@ -26,6 +26,8 @@ export interface BoundingBox {
 
 export interface UiElement {
   id: string;
+  agentId?: string;
+  nodeName?: string;
   role: string;
   text: string;
   placeholder?: string;
@@ -35,6 +37,9 @@ export interface UiElement {
   sensitivity: DataSensitivity;
   redactedText?: string;
   attributes?: Record<string, string>;
+  accessibleName?: string;
+  enabled?: boolean;
+  checked?: boolean;
 }
 
 export interface SensitiveEntity {
@@ -45,7 +50,21 @@ export interface SensitiveEntity {
   source: "regex" | "ner" | "vision" | "structural";
   token: string;
   reasons: string[];
+  /** Private-only. Never serialized to the network. */
   matchText?: string;
+  /** Private-only. Used to resolve TYPE token references locally. Never serialized to the network. */
+  rawValue?: string;
+  /** Optional entity-level bounding box (page CSS coordinates) for precise redaction. */
+  bounds?: BoundingBox;
+}
+
+export interface SanitizedSensitiveEntity {
+  id: string;
+  elementId: string;
+  type: SensitiveEntityType;
+  confidence: number;
+  source: "regex" | "ner" | "vision" | "structural";
+  token: string;
 }
 
 export interface DetectionSummary {
@@ -97,6 +116,12 @@ export interface SelectedVisionModel {
   reasons: string[];
 }
 
+/** The wire-safe projection of a vision model descriptor (no offline/catalog detail). */
+export type TransportVisionDescriptor = Pick<
+  VisionModelDescriptor,
+  "id" | "name" | "family" | "task"
+>;
+
 export interface ModelSelectionTrace {
   shortlist: Array<{ modelId: string; score: number }>;
   dominantBlindSpot: VisionObservation["kind"] | "none";
@@ -146,6 +171,31 @@ export interface SanitizedContext {
   metrics?: RubricMetrics;
 }
 
+export interface TransportContext {
+  sessionId: string;
+  pageUrl: string;
+  pageTitle: string;
+  timestamp: string;
+  elements: UiElement[];
+  sensitiveEntities: SanitizedSensitiveEntity[];
+  redactedRegions: BoundingBox[];
+  policyVersion: string;
+  privacyScore: number;
+  detectionSummary: DetectionSummary;
+  visionObservations: VisionObservation[];
+  selectedVisionModel?: {
+    descriptor: TransportVisionDescriptor;
+    weightedScore: number;
+    reasons: string[];
+  };
+  modelSelectionTrace?: ModelSelectionTrace;
+  securitySignals: SecuritySignal[];
+  policyDecisions: PolicyDecision[];
+  runtimeProfile: RuntimeProfile;
+  metrics?: RubricMetrics;
+  requestId?: string;
+}
+
 export type AgentActionType =
   | "CLICK"
   | "TYPE"
@@ -174,7 +224,7 @@ export interface ActionPlan {
 
 export interface PlanRequest {
   userGoal: string;
-  context: SanitizedContext;
+  context: TransportContext;
 }
 
 export interface PlanResponse {
@@ -193,4 +243,13 @@ export interface RedactionResult {
   tokenMap: Record<string, string>;
   redactedRegions: BoundingBox[];
   precisionEstimate: number;
+}
+
+export interface ExecutionResult {
+  actionId: string;
+  type: AgentActionType;
+  targetElementId?: string;
+  status: "success" | "skipped" | "failed";
+  message: string;
+  latencyMs: number;
 }

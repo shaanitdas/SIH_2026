@@ -1,9 +1,9 @@
-import { SanitizedContext } from "@sih/shared";
+import { TransportContext } from "@sih/shared";
 
 const MAX_ELEMENTS = 200;
 const MAX_ENTITIES = 150;
 
-export function minimizePayload(context: SanitizedContext): SanitizedContext {
+export function minimizePayload(context: TransportContext): TransportContext {
   return {
     ...context,
     elements: context.elements.slice(0, MAX_ELEMENTS).map((element) => ({

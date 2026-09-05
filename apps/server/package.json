@@ -1,22 +1,24 @@
 {
   "name": "@sih/server",
   "version": "1.0.0",
-  "description": "",
+  "description": "Privacy-aware planner server for the SIH 2026 browser agent. Strict transport schema, rate limiting, deterministic + LLM planners.",
   "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "bench": "vitest run --config vitest.bench.config.ts --reporter=verbose",
     "build": "tsc -p tsconfig.json",
     "lint": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/index.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["privacy", "planner", "browser-agent", "express", "sih"],
+  "author": "shaanitdas",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "@sih/shared": "^1.0.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "helmet": "^8.1.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {

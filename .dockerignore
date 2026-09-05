@@ -1,0 +1,17 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.git
+.env
+.env.local
+*.pem
+*.crx
+.DS_Store
+test-results
+playwright-report
+e2e/.tmp
+*.tsbuildinfo
+.github
+README.md
+apps/extension/src/generated/visionWorkerSource.js

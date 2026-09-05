@@ -37,12 +37,17 @@ export function redactElements(elements: UiElement[], entities: SensitiveEntity[
 
     for (const entity of related) {
       redactedText = tokenizeText(redactedText, entity);
+      if (entity.bounds) {
+        redactedRegions.push(entity.bounds);
+      }
       if (entity.type === "PASSWORD" || entity.confidence < 0.7) {
         sensitivity = "restricted";
       }
     }
 
-    redactedRegions.push(element.bounds);
+    if (!related.some((entity) => entity.bounds)) {
+      redactedRegions.push(element.bounds);
+    }
     return {
       ...element,
       sensitivity,
