@@ -1,0 +1,1 @@
+export declare const VISION_WORKER_SOURCE: string;

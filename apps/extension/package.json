@@ -1,16 +1,24 @@
 {
   "name": "@sih/extension",
   "version": "1.0.0",
-  "description": "",
+  "description": "Privacy-preserving on-device visual browser agent (Chrome MV3 extension)",
   "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc -p tsconfig.json",
-    "lint": "tsc -p tsconfig.json --noEmit"
+    "test": "vitest run",
+    "bench": "vitest run --config vitest.bench.config.ts --reporter=verbose",
+    "build": "tsc -p tsconfig.json && npm run bundle",
+    "bundle": "node scripts/embed-worker.mjs && node scripts/generate-icons.mjs && node build.mjs",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "icons": "node scripts/generate-icons.mjs"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "privacy",
+    "browser-agent",
+    "vision",
+    "sih"
+  ],
+  "author": "shaanitdas",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "@sih/shared": "^1.0.0"

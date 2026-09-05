@@ -1,23 +1,10 @@
-import { DetectionSummary, SensitiveEntity, SensitiveEntityType, UiElement } from "@sih/shared";
-
-interface PatternRule {
-  type: SensitiveEntityType;
-  regex: RegExp;
-  confidence: number;
-  reason: string;
-}
-
-const REGEX_RULES: PatternRule[] = [
-  { type: "AADHAAR", regex: /\b\d{4}[ -]?\d{4}[ -]?\d{4}\b/g, confidence: 0.94, reason: "Aadhaar-like format" },
-  { type: "PAN", regex: /\b[A-Z]{5}[0-9]{4}[A-Z]\b/g, confidence: 0.95, reason: "PAN format" },
-  { type: "GSTIN", regex: /\b\d{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]\b/g, confidence: 0.95, reason: "GSTIN format" },
-  { type: "UPI", regex: /\b[a-zA-Z0-9._-]{2,}@[a-zA-Z]{2,}\b/g, confidence: 0.85, reason: "UPI handle pattern" },
-  { type: "PHONE_IN", regex: /\b(?:\+91[-\s]?)?[6-9]\d{9}\b/g, confidence: 0.88, reason: "Indian mobile number pattern" },
-  { type: "IFSC", regex: /\b[A-Z]{4}0[A-Z0-9]{6}\b/g, confidence: 0.91, reason: "IFSC format" },
-  { type: "EMAIL", regex: /\b[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g, confidence: 0.86, reason: "Email pattern" },
-  { type: "CARD_NUMBER", regex: /\b(?:\d[ -]*?){13,19}\b/g, confidence: 0.82, reason: "Card-number-like sequence" },
-  { type: "DOB", regex: /\b(?:0?[1-9]|[12][0-9]|3[01])[\/\-.](?:0?[1-9]|1[0-2])[\/\-.](?:19|20)\d{2}\b/g, confidence: 0.8, reason: "Date-of-birth style date" },
-];
+import {
+  DetectionSummary,
+  PII_PATTERNS,
+  SensitiveEntity,
+  SensitiveEntityType,
+  UiElement,
+} from "@sih/shared";
 
 const NAME_CONTEXT_HINTS = ["name", "full name", "applicant", "beneficiary", "customer"];
 const ADDRESS_HINTS = ["address", "city", "district", "street", "pincode", "pin code", "state"];
@@ -30,6 +17,33 @@ export interface PiiDetectionResult {
 
 function normalize(text: string): string {
   return text.replace(/\s+/g, " ").trim();
+}
+
+export function detectPiiInText(text: string): SensitiveEntity[] {
+  const entities: SensitiveEntity[] = [];
+  const matches: Array<{ type: SensitiveEntityType; matchText: string; confidence: number; reason: string }> = [];
+  for (const rule of PII_PATTERNS) {
+    let match: RegExpExecArray | null;
+    while ((match = rule.regex.exec(text)) !== null) {
+      matches.push({ type: rule.type, matchText: match[0], confidence: rule.confidence, reason: rule.reason });
+    }
+    rule.regex.lastIndex = 0;
+  }
+
+  for (const match of matches) {
+    entities.push({
+      id: `text-${match.type}-${entities.length + 1}`,
+      elementId: "text-region",
+      type: match.type,
+      confidence: match.confidence,
+      source: "regex",
+      token: `<${match.type}_${entities.length + 1}>`,
+      reasons: [match.reason],
+      matchText: match.matchText,
+      rawValue: match.matchText,
+    });
+  }
+  return entities;
 }
 
 function extractTextCandidates(element: UiElement): string[] {
@@ -46,6 +60,7 @@ function pushEntity(
   source: SensitiveEntity["source"],
   reason: string,
   matchText?: string,
+  rawValue?: string,
 ): void {
   const token = `<${type}_${entities.length + 1}>`;
   entities.push({
@@ -57,13 +72,14 @@ function pushEntity(
     token,
     reasons: [reason],
     matchText,
+    rawValue,
   });
 }
 
 function detectByRegex(element: UiElement, entities: SensitiveEntity[]): void {
   const candidates = extractTextCandidates(element);
   for (const candidate of candidates) {
-    for (const rule of REGEX_RULES) {
+    for (const rule of PII_PATTERNS) {
       let match: RegExpExecArray | null;
       while ((match = rule.regex.exec(candidate)) !== null) {
         pushEntity(
@@ -73,6 +89,7 @@ function detectByRegex(element: UiElement, entities: SensitiveEntity[]): void {
           rule.confidence,
           "regex",
           rule.reason,
+          match[0],
           match[0],
         );
       }
@@ -111,7 +128,15 @@ function detectByHeuristicNer(element: UiElement, entities: SensitiveEntity[]): 
   const hasNameLabel = hintMatch(NAME_CONTEXT_HINTS, text);
 
   if (hasHonorific || hasNameLabel) {
-    pushEntity(entities, element, "NAME", hasHonorific ? 0.83 : 0.69, "ner", "Name-like phrase detected", text.slice(0, 80));
+    pushEntity(
+      entities,
+      element,
+      "NAME",
+      hasHonorific ? 0.83 : 0.69,
+      "ner",
+      "Name-like phrase detected",
+      text.slice(0, 80),
+    );
   }
 }
 
@@ -141,10 +166,11 @@ function buildSummary(entities: SensitiveEntity[]): DetectionSummary {
   const highConfidence = entities.filter((entity) => entity.confidence >= 0.85).length;
   const uncertain = entities.filter((entity) => entity.confidence < 0.7).length;
   const total = Math.max(entities.length, 1);
+  const round4 = (value: number): number => Math.round(value * 10_000) / 10_000;
 
   return {
-    recallEstimate: Math.min(0.99, 0.72 + highConfidence / (total * 4)),
-    precisionEstimate: Math.max(0.5, 0.95 - uncertain / (total * 2)),
+    recallEstimate: round4(Math.min(0.99, 0.72 + highConfidence / (total * 4))),
+    precisionEstimate: round4(Math.max(0.5, 0.95 - uncertain / (total * 2))),
     uncertainCount: uncertain,
   };
 }

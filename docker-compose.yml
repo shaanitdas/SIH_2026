@@ -1,0 +1,31 @@
+name: sih-privacyguard
+
+services:
+  planner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sih-privacyguard-planner:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-120}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PLANNER_API_KEY: ${PLANNER_API_KEY:-}
+      PLANNER_BASE_URL: ${PLANNER_BASE_URL:-https://api.openai.com/v1}
+      PLANNER_MODEL: ${PLANNER_MODEL:-gpt-4o-mini}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # Optionally pass secrets from a local .env (see .env.example):
+    env_file:
+      - path: .env
+        required: false

@@ -1,27 +1,49 @@
 {
   "name": "sih_2026",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Privacy-preserving on-device visual browser agent (SIH 2026). MV3 Chrome extension + local privacy firewall + planner server.",
   "scripts": {
     "test": "npm run test --workspaces --if-present",
+    "bench": "npm run bench --workspaces --if-present",
     "build": "npm --workspace @sih/shared run build && npm --workspace @sih/server run build && npm --workspace @sih/extension run build",
-    "lint": "npm --workspace @sih/shared run lint && npm --workspace @sih/server run lint && npm --workspace @sih/extension run lint"
+    "lint": "npm --workspace @sih/shared run lint && npm --workspace @sih/server run lint && npm --workspace @sih/extension run lint",
+    "e2e": "npm run build && playwright test --config e2e/playwright.config.ts",
+    "e2e:headed": "npm run build && E2E_HEADED=1 playwright test --config e2e/playwright.config.ts",
+    "docker:build": "docker build -t sih-privacyguard-planner .",
+    "docker:up": "docker compose up --build -d"
   },
   "repository": {
     "type": "git",
-    "url": "http://localhost:26831/shaanitdas/SIH_2026"
+    "url": "https://github.com/shaanitdas/SIH_2026.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "privacy",
+    "browser-agent",
+    "on-device",
+    "vision",
+    "chrome-extension",
+    "sih",
+    "pii-redaction"
+  ],
+  "author": "shaanitdas",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "private": true,
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/chrome": "^0.2.8",
     "@types/node": "^26.4.1",
-    "typescript": "^5.6.3"
+    "@types/supertest": "^7.2.1",
+    "esbuild": "^0.28.2",
+    "happy-dom": "^20.14.0",
+    "supertest": "^7.2.2",
+    "typescript": "^5.6.3",
+    "vitest": "^5.0.0"
   }
 }

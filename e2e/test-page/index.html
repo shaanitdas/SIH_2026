@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Example Bank Application</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <h1>Apply for the digital loan</h1>
+
+    <form id="application-form">
+      <label for="full-name">Full name</label>
+      <input id="full-name" name="fullName" type="text" value="Apple Achterberg" />
+
+      <label for="aadhaar">Aadhaar</label>
+      <input id="aadhaar" name="aadhaar" type="text" value="2345 6789 0123" />
+
+      <label for="phone">Mobile</label>
+      <input id="phone" name="mobile" type="text" value="+91 98765 43210" />
+
+      <label for="pan">PAN</label>
+      <input id="pan" name="pan" type="text" value="ABCDE1234F" />
+
+      <label for="card">Debit card</label>
+      <input id="card" name="card" type="text" value="4111 1111 1111 1111" />
+
+      <button id="submit-btn" type="button">Submit Application</button>
+      <a href="#help">Help</a>
+    </form>
+
+    <div id="status">ready</div>
+
+    <script>
+      document
+        .getElementById("submit-btn")
+        .addEventListener("click", () => {
+          document.getElementById("status").textContent = "Submitted by agent";
+        });
+    </script>
+  </body>
+</html>

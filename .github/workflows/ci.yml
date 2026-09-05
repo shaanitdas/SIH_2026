@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+      - name: Benchmark smoke
+        run: npm run bench
+
+      - name: Verify extension bundle artifacts
+        run: |
+          test -f apps/extension/dist/manifest.json
+          test -f apps/extension/dist/content/contentScript.js
+          test -f apps/extension/dist/background/serviceWorker.js
+          test -f apps/extension/dist/popup/popup.js
+          node -e "const m = require('./apps/extension/dist/manifest.json'); if (m.manifest_version !== 3) throw new Error('expected MV3'); if (!m.background?.service_worker) throw new Error('missing background service worker');"
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: verify
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Google Chrome (full build for extensions)
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
+      - name: Build
+        run: npm run build
+
+      - name: Run end-to-end tests against real Chrome
+        env:
+          E2E_CHANNEL: chrome
+          CI: "1"
+        run: |
+          npx playwright test --config e2e/playwright.config.ts
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: verify
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: docker compose config --quiet
+
+      - name: Build the planner image
+        run: docker build -t sih-privacyguard-planner .
+
+      # The extension signing key + packed CRX must never enter the build
+      # context, even in intermediate stages (both are in .dockerignore).
+      - name: Assert private-key artifacts are excluded from the build context
+        run: |
+          docker build --target build -t pg-context-check .
+          docker run --rm pg-context-check sh -c \
+            'test ! -e /app/apps/extension.pem && test ! -e /app/apps/extension.crx'
+
+      - name: Boot with docker compose and wait for a healthy planner
+        run: |
+          docker compose up --build -d
+          for i in $(seq 1 45); do
+            if docker compose ps planner --format json | grep -q '"Health":"healthy"'; then
+              echo "planner healthy"
+              break
+            fi
+            sleep 2
+          done
+          docker compose ps planner --format json
+          curl -fsS http://127.0.0.1:8080/health
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v --remove-orphans

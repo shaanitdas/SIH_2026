@@ -1,16 +1,17 @@
 {
   "name": "@sih/shared",
   "version": "1.0.0",
-  "description": "",
+  "description": "Shared contracts, PII patterns and the outbound transport policy for the SIH 2026 browser agent.",
   "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "vitest run",
+    "bench": "vitest run --config vitest.bench.config.ts --reporter=verbose",
     "build": "tsc -p tsconfig.json",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["privacy", "pii", "contracts", "sih"],
+  "author": "shaanitdas",
+  "license": "MIT",
   "type": "module",
   "types": "dist/index.d.ts",
   "exports": {
